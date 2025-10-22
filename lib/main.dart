@@ -5,25 +5,68 @@ import 'models/task.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  final isDark = prefs.getBool('isDarkMode') ?? false;
+  runApp(MyApp(initialDarkMode: isDark));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  final bool initialDarkMode;
+  const MyApp({super.key, required this.initialDarkMode});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late bool _isDarkMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _isDarkMode = widget.initialDarkMode;
+  }
+
+  Future<void> _toggleTheme() async {
+    setState(() {
+      _isDarkMode = !_isDarkMode;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', _isDarkMode);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CW3 Task Manager',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-      home: const TaskListScreen(),
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Colors.blue,
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Colors.blue,
+        brightness: Brightness.dark,
+      ),
+      home: TaskListScreen(
+        onToggleTheme: _toggleTheme,
+        isDarkMode: _isDarkMode,
+      ),
     );
   }
 }
 
 class TaskListScreen extends StatefulWidget {
-  const TaskListScreen({super.key});
+  final VoidCallback onToggleTheme;
+  final bool isDarkMode;
+  const TaskListScreen({
+    super.key,
+    required this.onToggleTheme,
+    required this.isDarkMode,
+  });
 
   @override
   State<TaskListScreen> createState() => _TaskListScreenState();
@@ -40,14 +83,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
     _load();
   }
 
-  // Save tasks to local storage
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     final jsonList = _tasks.map((t) => t.toJson()).toList();
     await prefs.setString('tasks', jsonEncode(jsonList));
   }
 
-  // Load tasks from local storage
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getString('tasks');
@@ -84,7 +125,16 @@ class _TaskListScreenState extends State<TaskListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('CW3 – Task Manager')),
+      appBar: AppBar(
+        title: const Text('CW3 – Task Manager'),
+        actions: [
+          IconButton(
+            tooltip: widget.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            onPressed: widget.onToggleTheme,
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -134,7 +184,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
                     title: Text(
                       t.name,
                       style: t.isDone
-                          ? const TextStyle(decoration: TextDecoration.lineThrough)
+                          ? const TextStyle(
+                          decoration: TextDecoration.lineThrough)
                           : null,
                     ),
                     trailing: IconButton(

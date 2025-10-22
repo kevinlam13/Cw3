@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models/task.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -29,8 +32,31 @@ class TaskListScreen extends StatefulWidget {
 class _TaskListScreenState extends State<TaskListScreen> {
   final _controller = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  List<Task> _tasks = [];
 
-  final List<Task> _tasks = [];
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  // Save tasks to local storage
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = _tasks.map((t) => t.toJson()).toList();
+    await prefs.setString('tasks', jsonEncode(jsonList));
+  }
+
+  // Load tasks from local storage
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString('tasks');
+    if (stored == null) return;
+    final decoded = jsonDecode(stored) as List;
+    setState(() {
+      _tasks = decoded.map((e) => Task.fromJson(e)).toList();
+    });
+  }
 
   void _addTask() {
     if (!_formKey.currentState!.validate()) return;
@@ -38,18 +64,21 @@ class _TaskListScreenState extends State<TaskListScreen> {
       _tasks.add(Task(name: _controller.text.trim()));
       _controller.clear();
     });
+    _save();
   }
 
   void _toggleDone(int index, bool? value) {
     setState(() {
       _tasks[index].isDone = value ?? false;
     });
+    _save();
   }
 
   void _deleteTask(int index) {
     setState(() {
       _tasks.removeAt(index);
     });
+    _save();
   }
 
   @override
